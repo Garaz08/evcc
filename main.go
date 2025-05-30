@@ -12,7 +12,6 @@ import (
 )
 
 var (
-	//go:embed dist
 	web embed.FS
 
 	//go:embed i18n/*.json
