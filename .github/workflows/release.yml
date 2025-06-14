@@ -7,10 +7,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  #call-build-workflow:
-  #  if: startsWith(github.ref, 'refs/tags')
-  #  uses: evcc-io/evcc/.github/workflows/default.yml@master
-
   docker:
     name: Publish Docker :release
     runs-on: ubuntu-latest
@@ -20,11 +16,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Login
+      - name: Login to Gitea Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_USER }}
-          password: ${{ secrets.DOCKER_PASS }}
+          # Ersetze 'YOUR_GITEA_URL' durch die URL deines Gitea-Servers (ohne http/s)
+          registry: git.zeit-z.de
+          username: ${{ github.actor }} # Oder dein Gitea Benutzername, wenn der PAT an einen spezifischen Benutzer gebunden ist
+          password: ${{ secrets.GITEA_TOKEN }} # Das in Gitea erstellte und als Secret gespeicherte PAT
 
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v3
@@ -33,8 +31,22 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
+          # Der Image-Name muss dem Format für Gitea Packages entsprechen:
+          # YOUR_GITEA_URL/YOUR_GITEA_USERNAME/YOUR_REPO_NAME (für Repository-Packages)
+          # YOUR_GITEA_URL/ORGANIZATION/PACKAGE_NAME (für Organisation-Packages)
+          # In den meisten Fällen für Repositories: <Gitea_URL>/<Repository_Besitzer>/<Repository_Name>
+          # Beispiel: your.gitea.url/user/evcc
           images: |
-            ${{ secrets.DOCKER_USER }}/evcc
+            git.zeit-z.de/${{ github.repository }} # Holt den Besitzer und den Repository-Namen
+          tags: |
+            type=schedule
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,format=long,prefix=
+            type=raw,value=latest,enable=${{ endsWith(github.ref, github.event.repository.default_branch) || contains(github.ref, 'main') || contains(github.ref, 'master') }}
 
       - name: Publish
         uses: docker/build-push-action@v6
@@ -45,3 +57,4 @@ jobs:
           build-args: |
             RELEASE=1
           tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
