@@ -44,4 +44,4 @@ jobs:
           push: true
           build-args: |
             RELEASE=1
-          tags: latest
+          tags: ${{ steps.meta.outputs.tags }}
